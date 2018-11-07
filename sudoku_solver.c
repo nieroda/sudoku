@@ -19,11 +19,11 @@ static char *_COL = "Col";
 static char *_BOX = "Box";
 
 static int **sudoku_board;
-static int is_sudoku = 1;
 
 struct sudoku_data {
   char *solve_for;
   uint8_t num;
+  uint8_t is_valid;
   uint16_t num_seen;
 };
 
@@ -48,24 +48,24 @@ const char *print_mapping[BOARD_LENGTH] = {
   "Bot Left", "Bot Middle", "Bot Right"
 };
 
-void solve_row(struct sudoku_data *s_d) {
+void* solve_row(struct sudoku_data *s_d) {
   for (int i = 0; i < BOARD_LENGTH; i++) {
     s_d->num_seen = setLocation(sudoku_board[s_d->num][i] - 1, s_d->num_seen);
   }
 
   checkForSudoku(s_d);
-  free(s_d);
+  return s_d;
 }
 
-void solve_column(struct sudoku_data *s_d) {
+void* solve_column(struct sudoku_data *s_d) {
   for (int i = 0; i < BOARD_LENGTH; i++) {
     s_d->num_seen = setLocation(sudoku_board[i][s_d->num] - 1, s_d->num_seen);
   }
   checkForSudoku(s_d);
-  free(s_d);
+  return s_d;
 }
 
-void solve_block(struct sudoku_data *s_d) {
+void* solve_block(struct sudoku_data *s_d) {
 
   for (int i = sudoku_mapping[s_d->num][0]; i <= sudoku_mapping[s_d->num][1]; i++) {
     for (int j = sudoku_mapping[s_d->num][2]; j <= sudoku_mapping[s_d->num][3]; j++) {
@@ -73,7 +73,7 @@ void solve_block(struct sudoku_data *s_d) {
     }
   }
   checkForSudoku(s_d);
-  free(s_d);
+  return s_d;
 }
 
 struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num/*, sudokuFunc f*/) {
@@ -81,6 +81,7 @@ struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num/*, sudokuFunc 
   s_d->solve_for = solve_for;
   s_d->num = num;
   s_d->num_seen = 0;
+  s_d->is_valid = 0;
   return s_d;
 }
 
@@ -91,8 +92,10 @@ void checkForSudoku(struct sudoku_data *s_d) {
     } else {
       printf("%s %d doesn't have the required values.\n", s_d->solve_for, s_d->num + 1);
     }
-    is_sudoku = 0;
+    s_d->is_valid = 1;
   }
+  else
+    s_d->is_valid = 0;
 }
 
 int main(int argc, char **argv) {
@@ -133,12 +136,25 @@ int main(int argc, char **argv) {
     pthread_create(&threads[thread_count++], NULL, (void *)solve_block, (void *) sdx2);
   }
 
+  int is_valid_sudoku = 0;
   for (int i = 0; i < BOARD_LENGTH * 3; i++) {
-    pthread_join(threads[i], NULL);
+    void *sudoku_data_return;
+    pthread_join(threads[i], &sudoku_data_return);
+    struct sudoku_data *test = (struct sudoku_data *)sudoku_data_return;
+    is_valid_sudoku |= test->is_valid;
+    free(test);
   }
 
-  if (is_sudoku == 0) {
-    printf("No Sudoku :(\n");
+  if (is_valid_sudoku) {
+    printf("The input is not a valid Sudoku.\n");
+  } else {
+    printf("The input is a valid Sudoku.\n");
   }
+
+  for (int i = 0; i < BOARD_LENGTH; i++) {
+    free(sudoku_board[i]);
+  }
+  free(sudoku_board);
+
 
 }
