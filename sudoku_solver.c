@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 
 #define ROW 0x01
@@ -17,13 +18,17 @@ static char *_ROW = "Row";
 static char *_COL = "Col";
 static char *_BOX = "Box";
 
-typedef void(*sudokuFunc)(struct sudoku_data *);
+static int **sudoku_board;
+static int is_sudoku = 1;
 
 struct sudoku_data {
   char *solve_for;
   uint8_t num;
   uint16_t num_seen;
 };
+
+void checkForSudoku(struct sudoku_data *);
+
 
 int sudoku_mapping[BOARD_LENGTH][4] = {
   {0, 2, 0, 2},
@@ -35,18 +40,6 @@ int sudoku_mapping[BOARD_LENGTH][4] = {
   {0, 2, 6, 8},
   {3, 5, 6, 8},
   {6, 8, 6, 8}
-};
-
-int sudoku_board[BOARD_LENGTH][BOARD_LENGTH] = {
-  {7, 2, 6, 3, 5, 9, 4, 1, 8},
-  {4, 5, 8, 1, 6, 7, 2, 3, 9},
-  {9, 1, 3, 8, 2, 4, 7, 6, 5},
-  {1, 6, 2, 9, 7, 5, 3, 8, 4},
-  {3, 9, 4, 2, 8, 6, 1, 5, 7},
-  {8, 7, 5, 4, 1, 3, 9, 2, 6},
-  {5, 3, 7, 6, 4, 1, 8, 9, 2},
-  {6, 8, 9, 7, 3, 2, 5, 4, 1},
-  {2, 4, 1, 5, 9, 8, 6, 7, 3}
 };
 
 const char *print_mapping[BOARD_LENGTH] = {
@@ -61,6 +54,7 @@ void solve_row(struct sudoku_data *s_d) {
   }
 
   checkForSudoku(s_d);
+  free(s_d);
 }
 
 void solve_column(struct sudoku_data *s_d) {
@@ -68,6 +62,7 @@ void solve_column(struct sudoku_data *s_d) {
     s_d->num_seen = setLocation(sudoku_board[i][s_d->num] - 1, s_d->num_seen);
   }
   checkForSudoku(s_d);
+  free(s_d);
 }
 
 void solve_block(struct sudoku_data *s_d) {
@@ -78,6 +73,7 @@ void solve_block(struct sudoku_data *s_d) {
     }
   }
   checkForSudoku(s_d);
+  free(s_d);
 }
 
 struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num/*, sudokuFunc f*/) {
@@ -88,31 +84,61 @@ struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num/*, sudokuFunc 
   return s_d;
 }
 
-int checkForSudoku(struct sudoku_data *s_d) {
+void checkForSudoku(struct sudoku_data *s_d) {
   if (s_d->num_seen != 511) {
     if (strcmp(s_d->solve_for, "Box") == 0) {
-      printf("MAPPING IS: %s\n", print_mapping[0]);
       printf("%s %d doesn't have the required values.\n", print_mapping[s_d->num], s_d->num + 1);
     } else {
       printf("%s %d doesn't have the required values.\n", s_d->solve_for, s_d->num + 1);
     }
-    return 0;
+    is_sudoku = 0;
   }
-  return 1;
 }
 
-int main() {
+int main(int argc, char **argv) {
+
+  if (argc != 2) {
+    printf("2 arguments required... <./sudoku_solver.out <filename>>\n");
+    exit(-1);
+  }
+
+  sudoku_board = malloc(BOARD_LENGTH * sizeof(int*));
+  for (int i = 0; i < BOARD_LENGTH; i++) {
+    sudoku_board[i] = malloc(BOARD_LENGTH * sizeof(int));
+  }
+
+  FILE *file = fopen(*(argv + 1), "r");
+
+  if (file == NULL) {
+    printf("No file exists.\n");
+    exit(-1);
+  }
+
+  int c, counter = 0;
+  while ((c = getc(file)) != EOF) {
+    if (c == ' ' || c == '\n') continue;
+    sudoku_board[counter / BOARD_LENGTH][counter % BOARD_LENGTH] = (int)c - '0';
+    ++counter;
+  }
 
   pthread_t threads[27];
   int thread_count = 0;
 
-  for (int i = 0; i < 9; i++) {
-    struct sudoku_data *sdx = _s_malloc_sudoku(_ROW, i);
+  for (int i = 0; i < BOARD_LENGTH; i++) {
+    struct sudoku_data *sdx =  _s_malloc_sudoku(_ROW, i);
     struct sudoku_data *sdx1 = _s_malloc_sudoku(_COL, i);
     struct sudoku_data *sdx2 = _s_malloc_sudoku(_BOX, i);
-    pthread_create(&threads[thread_count++], NULL, solve_row, (void *) sdx);
-    pthread_create(&threads[thread_count++], NULL, solve_column, (void *) sdx1);
-    pthread_create(&threads[thread_count++], NULL, solve_block, (void *) sdx2);
+    pthread_create(&threads[thread_count++], NULL, (void *)solve_row, (void *) sdx);
+    pthread_create(&threads[thread_count++], NULL, (void *)solve_column, (void *) sdx1);
+    pthread_create(&threads[thread_count++], NULL, (void *)solve_block, (void *) sdx2);
   }
-  pthread_join(threads[26], NULL);
+
+  for (int i = 0; i < BOARD_LENGTH * 3; i++) {
+    pthread_join(threads[i], NULL);
+  }
+
+  if (is_sudoku == 0) {
+    printf("No Sudoku :(\n");
+  }
+
 }
