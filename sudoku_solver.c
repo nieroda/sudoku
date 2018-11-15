@@ -1,24 +1,17 @@
-// gcc -lpthread sudoku_solver.c
-
-#include <inttypes.h>
+#include <inttypes.h> //// gcc -lpthread sudoku_solver.c
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 
-#define ROW 0x01
-#define COL 0x02
-#define BOX 0x03
 #define BOARD_LENGTH 9
-
 #define setLocation(n, val) ((val) |= (1 << (n)))
-#define clrLocation(n, val) ((val) &= ~((1 << (n)))
 
 static char *_ROW = "Row";
 static char *_COL = "Col";
 static char *_BOX = "Box";
 
-static int **sudoku_board;
+static int sudoku_board[BOARD_LENGTH][BOARD_LENGTH];
 
 struct sudoku_data {
   char *solve_for;
@@ -28,19 +21,6 @@ struct sudoku_data {
 };
 
 void checkForSudoku(struct sudoku_data *);
-
-
-int sudoku_mapping[BOARD_LENGTH][4] = {
-  {0, 2, 0, 2},
-  {3, 5, 0, 2},
-  {6, 8, 0, 2},
-  {0, 2, 3, 5},
-  {3, 5, 3, 5},
-  {6, 8, 3, 5},
-  {0, 2, 6, 8},
-  {3, 5, 6, 8},
-  {6, 8, 6, 8}
-};
 
 const char *print_mapping[BOARD_LENGTH] = {
   "Top Left", "Top Middle", "Top Right",
@@ -52,7 +32,6 @@ void* solve_row(struct sudoku_data *s_d) {
   for (int i = 0; i < BOARD_LENGTH; i++) {
     s_d->num_seen = setLocation(sudoku_board[s_d->num][i] - 1, s_d->num_seen);
   }
-
   checkForSudoku(s_d);
   return s_d;
 }
@@ -66,9 +45,8 @@ void* solve_column(struct sudoku_data *s_d) {
 }
 
 void* solve_block(struct sudoku_data *s_d) {
-
-  for (int i = sudoku_mapping[s_d->num][0]; i <= sudoku_mapping[s_d->num][1]; i++) {
-    for (int j = sudoku_mapping[s_d->num][2]; j <= sudoku_mapping[s_d->num][3]; j++) {
+  for (int i = (s_d->num / 3) * 3; i <= (s_d->num / 3) * 3 + 2; i++) {
+    for (int j = (s_d->num % 3) * 3; j <= (s_d->num % 3) * 3 + 2; j++) {
       s_d->num_seen = setLocation(sudoku_board[i][j] - 1, s_d->num_seen);
     }
   }
@@ -76,7 +54,7 @@ void* solve_block(struct sudoku_data *s_d) {
   return s_d;
 }
 
-struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num/*, sudokuFunc f*/) {
+struct sudoku_data *_s_malloc_sudoku(char *solve_for, uint8_t num) {
   struct sudoku_data *s_d = malloc(sizeof(struct sudoku_data));
   s_d->solve_for = solve_for;
   s_d->num = num;
@@ -103,11 +81,6 @@ int main(int argc, char **argv) {
   if (argc != 2) {
     printf("2 arguments required... <./sudoku_solver.out <filename>>\n");
     exit(-1);
-  }
-
-  sudoku_board = malloc(BOARD_LENGTH * sizeof(int*));
-  for (int i = 0; i < BOARD_LENGTH; i++) {
-    sudoku_board[i] = malloc(BOARD_LENGTH * sizeof(int));
   }
 
   FILE *file = fopen(*(argv + 1), "r");
@@ -151,10 +124,5 @@ int main(int argc, char **argv) {
     printf("The input is a valid Sudoku.\n");
   }
 
-  for (int i = 0; i < BOARD_LENGTH; i++) {
-    free(sudoku_board[i]);
-  }
-  free(sudoku_board);
-
-
+  return 1;
 }
